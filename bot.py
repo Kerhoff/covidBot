@@ -7,7 +7,7 @@ covid19 = COVID19Py.COVID19()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 #initialize bot
-updater = Updater(token='my_token', use_context=True)
+updater = Updater(token='TOKEN', use_context=True)
 dispatcher = updater.dispatcher
 
 def start(update, context):
