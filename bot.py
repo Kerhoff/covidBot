@@ -1,26 +1,55 @@
-import COVID19Py, logging, requests
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-
-#initialize covid
-covid19 = COVID19Py.COVID19()
+import logging, requests, json
+from COVID19Py import COVID19
+from config import token
+from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters)
+from telegram import ParseMode, ChatAction, ReplyKeyboardMarkup
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-#initialize bot
-updater = Updater(token='TOKEN', use_context=True)
-dispatcher = updater.dispatcher
+covid19 = COVID19()
+data = dict()
+
+def get_latest_data():
+    global data 
+    data = covid19.getAll()
 
 def start(update, context):
-    context.bot.send_message(chat_id=update.effective_chat.id, text="I'm a bot, please talk to me!")
+    bot_keyboard = [['covid', 'top-right'], 
+                        ['bottom-left', 'bottom-right']]
+    reply_markup = ReplyKeyboardMarkup(bot_keyboard)
+    context.bot.send_message(chat_id=update.effective_chat.id, 
+                 text="I'm a bot, please talk to me!", 
+                 reply_markup=reply_markup)
 
-def covid(update, context):
-    latest = covid19.getLatest()
-    message = f"Total:\n\nConfirmed: {latest['confirmed']}\n\nDeaths: {latest['deaths']}"
-    context.bot.send_message(chat_id=update.effective_chat.id, text=message)
-    print(latest)
+def reply_to_message(update, context):
+    context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    text = update.message.text
+    
+    if (not bool(data)):
+        get_latest_data()
 
-def echo(update, context):
-    context.bot.send_message(chat_id=update.effective_chat.id, text=update.message.text)
+    if text == 'covid':
+        covid_keyboard = [['latest', 'Russia'],
+                        ['main menu']]
+        reply_markup = ReplyKeyboardMarkup(covid_keyboard)
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+                     text="You are in COVID19 menu", 
+                     reply_markup=reply_markup)
+    elif text == 'latest':
+        latest = data['latest']
+        message = f"*Total:*\nConfirmed: {latest['confirmed']:,}\nDeaths: {latest['deaths']:,}"
+        context.bot.send_message(chat_id=update.effective_chat.id, text=message, parse_mode=ParseMode.MARKDOWN_V2)
+    elif text == 'main menu':
+        main_keyboard = [['covid', 'top-right'], 
+                        ['bottom-left', 'bottom-right']]
+        reply_markup = ReplyKeyboardMarkup(main_keyboard)
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+                 text="You are in the main menu.", 
+                 reply_markup=reply_markup)
+    else:
+        message = text
+        context.bot.send_message(chat_id=update.effective_chat.id, text=message, parse_mode=ParseMode.MARKDOWN_V2)
 
 def caps(update, context):
     text_caps = ' '.join(context.args).upper()
@@ -29,27 +58,27 @@ def caps(update, context):
 def unknown(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command.")
 
-start_handler = CommandHandler('start', start)
-dispatcher.add_handler(start_handler)
+def bot():
+    updater = Updater(token=token, use_context=True)
+    dispatcher = updater.dispatcher
+    
+    start_handler = CommandHandler('start', start)
+    dispatcher.add_handler(start_handler)
 
-covid_handler = CommandHandler('covid', covid)
-dispatcher.add_handler(covid_handler)
+    """covid_handler = CommandHandler('covid', covid)
+    dispatcher.add_handler(covid_handler)"""
 
-caps_handler = CommandHandler('caps', caps)
-dispatcher.add_handler(caps_handler)
+    caps_handler = CommandHandler('caps', caps)
+    dispatcher.add_handler(caps_handler)
 
-echo_handler = MessageHandler(Filters.text, echo)
-dispatcher.add_handler(echo_handler)
+    unknown_handler = MessageHandler(Filters.command, unknown)
+    dispatcher.add_handler(unknown_handler)
 
-unknown_handler = MessageHandler(Filters.command, unknown)
-dispatcher.add_handler(unknown_handler)
+    message_handler = MessageHandler(Filters.text, reply_to_message)
+    dispatcher.add_handler(message_handler)
 
+    updater.start_polling()
+    updater.idle()
 
-updater.start_polling()
-
-"""
-location = covid19.getLocationByCountryCode('RU')
-print(type(locations)) # locations is list
-print(type(locations[0])) # location is dict
-print(locations[0].keys()) # ['id', 'country', 'country_code', 'country_population', 'province', 'last_updated', 'coordinates', 'latest']
-"""
+if __name__ == "__main__":
+    bot()
